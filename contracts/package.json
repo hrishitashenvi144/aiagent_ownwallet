@@ -1,0 +1,10 @@
+{
+  "name": "auditagent-contracts",
+  "version": "0.1.0",
+  "description": "Foundry smart contracts for AuditAgent",
+  "scripts": {
+    "test": "node test/contracts.test.js"
+  },
+  "keywords": ["solidity", "foundry", "agent", "smart-contract"],
+  "license": "MIT"
+}

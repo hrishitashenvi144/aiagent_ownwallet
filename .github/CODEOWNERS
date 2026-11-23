@@ -1,0 +1,24 @@
+# AuditAgent Code Owners Specification
+# Any change to these paths requires review from the designated owner(s).
+
+# Global repository oversight
+* @lead-engineer
+
+# Core contracts and Foundry test harness (Person 1)
+/contracts/ @person1-contracts @lead-engineer
+/shared/abis/ @person1-contracts @lead-engineer
+
+# Static analysis, LLM triage, benchmark runners (Person 2)
+/analysis/ @person2-analysis @lead-engineer
+/benchmarks/ @person2-analysis @lead-engineer
+
+# Agent service, x402 paywall, economic brain, DB (Person 3)
+/agent/ @person3-agentcore @lead-engineer
+
+# Customer & owner dashboard, security attack suite (Person 4)
+/dashboard/ @person4-dashboard @lead-engineer
+/security-tests/ @person4-dashboard @lead-engineer
+
+# Shared interface contracts and specifications (Requires Lead review)
+/shared/ @lead-engineer @person1-contracts @person2-analysis @person3-agentcore @person4-dashboard
+/docs/INTERFACES.md @lead-engineer

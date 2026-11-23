@@ -1,0 +1,104 @@
+[
+  {
+    "type": "function",
+    "name": "createEscrow",
+    "inputs": [
+      { "name": "jobId", "type": "bytes32", "internalType": "bytes32" },
+      { "name": "reviewer", "type": "address", "internalType": "address" },
+      { "name": "amount", "type": "uint256", "internalType": "uint256" },
+      { "name": "deadline", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "releaseEscrow",
+    "inputs": [
+      { "name": "jobId", "type": "bytes32", "internalType": "bytes32" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "refundEscrow",
+    "inputs": [
+      { "name": "jobId", "type": "bytes32", "internalType": "bytes32" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getEscrow",
+    "inputs": [
+      { "name": "jobId", "type": "bytes32", "internalType": "bytes32" }
+    ],
+    "outputs": [
+      { "name": "client", "type": "address", "internalType": "address" },
+      { "name": "reviewer", "type": "address", "internalType": "address" },
+      { "name": "amount", "type": "uint256", "internalType": "uint256" },
+      { "name": "deadline", "type": "uint256", "internalType": "uint256" },
+      { "name": "status", "type": "uint8", "internalType": "uint8" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "EscrowCreated",
+    "inputs": [
+      { "name": "jobId", "type": "bytes32", "indexed": true, "internalType": "bytes32" },
+      { "name": "client", "type": "address", "indexed": true, "internalType": "address" },
+      { "name": "reviewer", "type": "address", "indexed": true, "internalType": "address" },
+      { "name": "amount", "type": "uint256", "indexed": false, "internalType": "uint256" },
+      { "name": "deadline", "type": "uint256", "indexed": false, "internalType": "uint256" }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "EscrowReleased",
+    "inputs": [
+      { "name": "jobId", "type": "bytes32", "indexed": true, "internalType": "bytes32" },
+      { "name": "reviewer", "type": "address", "indexed": true, "internalType": "address" },
+      { "name": "amount", "type": "uint256", "indexed": false, "internalType": "uint256" }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "EscrowRefunded",
+    "inputs": [
+      { "name": "jobId", "type": "bytes32", "indexed": true, "internalType": "bytes32" },
+      { "name": "client", "type": "address", "indexed": true, "internalType": "address" },
+      { "name": "amount", "type": "uint256", "indexed": false, "internalType": "uint256" }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "EscrowAlreadyExists",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "EscrowNotFound",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "EscrowNotActive",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "DeadlineNotPassed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Unauthorized",
+    "inputs": []
+  }
+]

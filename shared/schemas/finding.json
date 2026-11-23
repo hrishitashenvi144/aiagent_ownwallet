@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auditagent.local/schemas/finding.json",
+  "title": "Finding",
+  "description": "Normalized security vulnerability or quality finding produced by AuditAgent analysis pipeline.",
+  "type": "object",
+  "required": [
+    "id",
+    "title",
+    "severity",
+    "confidence",
+    "location",
+    "evidence",
+    "explanation",
+    "suggested_fix",
+    "tool_source"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique deterministic finding ID (e.g., SWC-107-001 or VULN-REENTRANCY-1)"
+    },
+    "title": {
+      "type": "string",
+      "description": "Concise headline describing the vulnerability"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["Critical", "High", "Medium", "Low", "Informational"],
+      "description": "Standardized CVSS-like impact rating"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["High", "Medium", "Low"],
+      "description": "Tool / LLM confidence that this finding is a true positive"
+    },
+    "location": {
+      "type": "object",
+      "required": ["file", "start_line", "end_line"],
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "Relative path to target source file"
+        },
+        "contract_name": {
+          "type": "string",
+          "description": "Name of Solidity contract"
+        },
+        "function_name": {
+          "type": "string",
+          "description": "Target function signature or name"
+        },
+        "start_line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "end_line": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "evidence": {
+      "type": "string",
+      "description": "Raw code snippet, trace, or AST extract proving the issue"
+    },
+    "explanation": {
+      "type": "string",
+      "description": "Detailed explanation of vulnerability mechanics and exploit scenario"
+    },
+    "suggested_fix": {
+      "type": "string",
+      "description": "Remediation guidance or code diff"
+    },
+    "tool_source": {
+      "type": "string",
+      "enum": ["slither", "aderyn", "llm", "foundry_fuzz"],
+      "description": "Origin analyzer that detected the issue"
+    },
+    "poc_test_path": {
+      "type": "string",
+      "description": "Optional path to LLM-generated Foundry test validating the exploit"
+    }
+  },
+  "additionalProperties": false
+}

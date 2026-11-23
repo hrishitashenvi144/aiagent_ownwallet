@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auditagent.local/schemas/quote.json",
+  "title": "Quote",
+  "description": "Quotation details for an audit service request.",
+  "type": "object",
+  "required": [
+    "quote_id",
+    "job_id",
+    "scan_depth",
+    "price_usdc",
+    "price_raw",
+    "estimated_time_seconds",
+    "expires_at",
+    "payment_recipient"
+  ],
+  "properties": {
+    "quote_id": {
+      "type": "string"
+    },
+    "job_id": {
+      "type": "string"
+    },
+    "scan_depth": {
+      "type": "string",
+      "enum": ["quick", "standard", "deep"]
+    },
+    "price_usdc": {
+      "type": "number",
+      "description": "Human-readable price in USDC (e.g. 15.00)"
+    },
+    "price_raw": {
+      "type": "string",
+      "description": "USDC token amount in base units (6 decimals)"
+    },
+    "estimated_time_seconds": {
+      "type": "integer",
+      "minimum": 5
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payment_recipient": {
+      "type": "string",
+      "pattern": "^0x[a-fA-F0-9]{40}$"
+    }
+  },
+  "additionalProperties": false
+}

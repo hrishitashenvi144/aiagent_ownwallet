@@ -1,0 +1,382 @@
+openapi: 3.1.0
+info:
+  title: AuditAgent Service API
+  description: Autonomous AI blockchain smart contract security triage & audit API with x402 on-chain payment integration.
+  version: 0.1.0
+servers:
+  - url: http://localhost:8000
+    description: Local development agent service
+
+paths:
+  /quote:
+    post:
+      summary: Request dynamic quote for audit
+      description: Returns pricing and depth recommendations based on source complexity and gas costs.
+      operationId: getQuote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contract_source, scan_depth]
+              properties:
+                contract_source:
+                  type: string
+                  description: Solidity code to audit
+                  example: "pragma solidity ^0.8.20; contract Test { uint256 public x; }"
+                scan_depth:
+                  type: string
+                  enum: [quick, standard, deep]
+                  default: standard
+      responses:
+        '200':
+          description: Quote generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quote'
+        '400':
+          description: Invalid source or unsupported Solidity version
+
+  /jobs:
+    post:
+      summary: Submit contract audit job
+      description: |
+        Submits a job. If payment proof is omitted or unverified, returns HTTP 402 Payment Required
+        with instructions and recipient address. If payment proof (tx hash) is provided in headers
+        or payload and verified on-chain, job transitions to 'paid' and triggers analysis.
+      operationId: createJob
+      parameters:
+        - name: X-Payment-Proof
+          in: header
+          required: false
+          description: Transaction hash of ERC20 USDC transfer or AgentWallet deposit with job_id in calldata/log.
+          schema:
+            type: string
+            pattern: "^0x[a-fA-F0-9]{64}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customer_address, contract_source, scan_depth]
+              properties:
+                customer_address:
+                  type: string
+                  pattern: "^0x[a-fA-F0-9]{40}$"
+                  example: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+                contract_source:
+                  type: string
+                  example: "pragma solidity ^0.8.20; contract Vulnerable { ... }"
+                scan_depth:
+                  type: string
+                  enum: [quick, standard, deep]
+                  default: standard
+                payment_tx_hash:
+                  type: string
+                  nullable: true
+                  description: Alternative to X-Payment-Proof header
+      responses:
+        '201':
+          description: Job created and payment verified; analysis started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '402':
+          description: Payment Required (x402 Flow)
+          headers:
+            X-Accept-Token:
+              schema:
+                type: string
+                example: "0x036CbD53842c5426634e7929541eC2318f3dCF7e (USDC Base Sepolia)"
+            X-Payment-Address:
+              schema:
+                type: string
+                example: "0x1234567890123456789012345678901234567890"
+            X-Required-Amount:
+              schema:
+                type: string
+                example: "15000000"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentRequiredError'
+
+  /jobs/{job_id}:
+    get:
+      summary: Get job lifecycle status
+      operationId: getJobStatus
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Current job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '404':
+          description: Job not found
+
+  /jobs/{job_id}/report:
+    get:
+      summary: Retrieve ranked security triage report
+      operationId: getJobReport
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Completed audit report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+        '409':
+          description: Report not ready yet (status is analyzing or paid)
+        '404':
+          description: Job or report not found
+
+  /agent/status:
+    get:
+      summary: Get agent operational status, wallet balance and risk metrics
+      operationId: getAgentStatus
+      responses:
+        '200':
+          description: Agent status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, wallet_address, usdc_balance, daily_spent, is_paused]
+                properties:
+                  status:
+                    type: string
+                    enum: [idle, busy, paused, error]
+                  wallet_address:
+                    type: string
+                  usdc_balance:
+                    type: string
+                  daily_spent:
+                    type: string
+                  daily_limit:
+                    type: string
+                  is_paused:
+                    type: boolean
+                  active_jobs_count:
+                    type: integer
+                  uptime_seconds:
+                    type: number
+
+  /owner/pause:
+    post:
+      summary: Owner override to pause or kill agent operations
+      operationId: pauseAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [paused, signature]
+              properties:
+                paused:
+                  type: boolean
+                signature:
+                  type: string
+                  description: EIP-712 or ECDSA signature from contract owner
+      responses:
+        '200':
+          description: Agent state updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  is_paused:
+                    type: boolean
+        '403':
+          description: Unauthorized owner signature
+
+components:
+  schemas:
+    Quote:
+      type: object
+      required: [quote_id, job_id, scan_depth, price_usdc, price_raw, estimated_time_seconds, expires_at, payment_recipient]
+      properties:
+        quote_id:
+          type: string
+        job_id:
+          type: string
+        scan_depth:
+          type: string
+          enum: [quick, standard, deep]
+        price_usdc:
+          type: number
+        price_raw:
+          type: string
+        estimated_time_seconds:
+          type: integer
+        expires_at:
+          type: string
+          format: date-time
+        payment_recipient:
+          type: string
+
+    Job:
+      type: object
+      required: [job_id, status, customer_address, scan_depth, created_at, updated_at]
+      properties:
+        job_id:
+          type: string
+        status:
+          type: string
+          enum: [created, quoted, paid, analyzing, delivered, failed, refunded]
+        customer_address:
+          type: string
+        contract_source:
+          type: string
+        scan_depth:
+          type: string
+          enum: [quick, standard, deep]
+        quote_amount:
+          type: string
+        tx_hash:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        error_message:
+          type: string
+          nullable: true
+
+    PaymentRequiredError:
+      type: object
+      required: [error, job_id, required_amount_usdc, required_amount_raw, payment_address, payment_token, instructions]
+      properties:
+        error:
+          type: string
+          example: "Payment Required"
+        job_id:
+          type: string
+        required_amount_usdc:
+          type: number
+          example: 15.00
+        required_amount_raw:
+          type: string
+          example: "15000000"
+        payment_address:
+          type: string
+          example: "0x1234567890123456789012345678901234567890"
+        payment_token:
+          type: string
+          example: "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+        instructions:
+          type: string
+          example: "Transfer 15 USDC to payment_address on Base Sepolia with job_id in calldata or submit tx_hash in X-Payment-Proof header."
+
+    Finding:
+      type: object
+      required: [id, title, severity, confidence, location, evidence, explanation, suggested_fix, tool_source]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        severity:
+          type: string
+          enum: [Critical, High, Medium, Low, Informational]
+        confidence:
+          type: string
+          enum: [High, Medium, Low]
+        location:
+          type: object
+          required: [file, start_line, end_line]
+          properties:
+            file:
+              type: string
+            contract_name:
+              type: string
+            function_name:
+              type: string
+            start_line:
+              type: integer
+            end_line:
+              type: integer
+        evidence:
+          type: string
+        explanation:
+          type: string
+        suggested_fix:
+          type: string
+        tool_source:
+          type: string
+          enum: [slither, aderyn, llm, foundry_fuzz]
+        poc_test_path:
+          type: string
+
+    Report:
+      type: object
+      required: [job_id, timestamp, scan_depth, target_contract, summary, findings, triage_notes]
+      properties:
+        job_id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        scan_depth:
+          type: string
+          enum: [quick, standard, deep]
+        target_contract:
+          type: string
+        summary:
+          type: object
+          required: [risk_score, total_critical, total_high, total_medium, total_low, total_informational]
+          properties:
+            risk_score:
+              type: number
+            total_critical:
+              type: integer
+            total_high:
+              type: integer
+            total_medium:
+              type: integer
+            total_low:
+              type: integer
+            total_informational:
+              type: integer
+        findings:
+          type: array
+          items:
+            $ref: '#/components/schemas/Finding'
+        triage_notes:
+          type: string
+        second_opinion:
+          type: object
+          properties:
+            reviewer_address:
+              type: string
+            escrow_id:
+              type: string
+            consensus_score:
+              type: number
+            notes:
+              type: string
+        gas_report:
+          type: object

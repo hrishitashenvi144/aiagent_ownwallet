@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auditagent.local/schemas/job.json",
+  "title": "JobRecord",
+  "description": "Lifecycle state and metadata for an audit submission.",
+  "type": "object",
+  "required": [
+    "job_id",
+    "status",
+    "customer_address",
+    "contract_source",
+    "scan_depth",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "job_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "created",
+        "quoted",
+        "paid",
+        "analyzing",
+        "delivered",
+        "failed",
+        "refunded"
+      ]
+    },
+    "customer_address": {
+      "type": "string",
+      "pattern": "^0x[a-fA-F0-9]{40}$"
+    },
+    "contract_source": {
+      "type": "string",
+      "description": "Solidity source code or base64 encoded bundle"
+    },
+    "scan_depth": {
+      "type": "string",
+      "enum": ["quick", "standard", "deep"]
+    },
+    "quote_amount": {
+      "type": "string",
+      "description": "USDC token amount in base units (6 decimals) e.g., '10000000' for 10 USDC"
+    },
+    "tx_hash": {
+      "type": ["string", "null"],
+      "pattern": "^0x[a-fA-F0-9]{64}$"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "error_message": {
+      "type": ["string", "null"]
+    }
+  },
+  "additionalProperties": false
+}
