@@ -13,7 +13,8 @@
     "evidence",
     "explanation",
     "suggested_fix",
-    "tool_source"
+    "tool_source",
+    "verified"
   ],
   "properties": {
     "id": {
@@ -32,7 +33,7 @@
     "confidence": {
       "type": "string",
       "enum": ["High", "Medium", "Low"],
-      "description": "Tool / LLM confidence that this finding is a true positive"
+      "description": "Tool / LLM confidence that this finding is a true positive. High/Critical unverified findings are demoted to Low."
     },
     "location": {
       "type": "object",
@@ -74,12 +75,20 @@
     },
     "tool_source": {
       "type": "string",
-      "enum": ["slither", "aderyn", "llm", "foundry_fuzz"],
+      "enum": ["slither", "aderyn", "mythril", "llm", "foundry_fuzz"],
       "description": "Origin analyzer that detected the issue"
+    },
+    "verified": {
+      "type": "boolean",
+      "description": "True if finding has been independently verified by a synthesized, successfully executed Foundry PoC exploit test"
+    },
+    "poc_path": {
+      "type": "string",
+      "description": "Filepath to the synthesized Foundry test that executed and proved this vulnerability"
     },
     "poc_test_path": {
       "type": "string",
-      "description": "Optional path to LLM-generated Foundry test validating the exploit"
+      "description": "Legacy alias for poc_path"
     }
   },
   "additionalProperties": false

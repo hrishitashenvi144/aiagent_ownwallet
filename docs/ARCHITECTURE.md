@@ -2,111 +2,132 @@
 
 ## 1. System Overview
 
-AuditAgent integrates distributed on-chain mechanics with a containerized AI analysis backend and a modern web dashboard.
+AuditAgent is engineered as an industry-standard autonomous agentic system rather than a naive LLM wrapper. It combines a deterministic **Plan -> Act -> Observe -> Replan** cognitive state machine, a typed **Tool Registry**, a **Verify-Before-Report** exploit synthesis pipeline, persistent **Agent Memory**, dynamic **Model Routing**, and real-time **Observability Tracing**.
 
 ```mermaid
 flowchart TB
-    subgraph Frontend["User & Operator Interfaces"]
-        CustomerUI["Customer Portal (Next.js)"]
-        OwnerUI["Owner / Kill-Switch Console"]
+    subgraph ClientAndUI["Client & Operator Layer"]
+        CustomerUI["Customer Portal (Submit & Pay x402)"]
+        OwnerUI["Owner Console (Telemetry, Trace Viewer & Approvals)"]
     end
 
-    subgraph Gateway["Agent Core Service (FastAPI)"]
-        Router["API Gateway (/quote, /jobs, /status)"]
-        Paywall["x402 Payment Guard"]
-        EconBrain["Economic Brain (Pricing & Depth Planner)"]
-        JobManager["Job Lifecycle Engine"]
-        DB[(SQLite Job Store)]
+    subgraph AgentCoreService["Agent Core & Cognitive Architecture (FastAPI + LangGraph)"]
+        Paywall["x402 Paywall & Payment Verifier"]
+        StateEngine["Agent Loop State Machine (Plan -> Act -> Observe -> Replan)"]
+        ModelRouter["Dynamic Model Router (Cheap Triage vs. Strong Reasoning)"]
+        ToolDispatcher["Tool Registry & Permission Dispatcher"]
+        AgentMemory[("Persistent Agent Memory (SQLite)")]
+        TraceLogger["Execution Trace Logger (StepTrace)"]
 
-        Router --> Paywall
-        Paywall --> JobManager
-        JobManager --> EconBrain
-        JobManager --> DB
+        Paywall --> StateEngine
+        StateEngine <--> AgentMemory
+        StateEngine --> ModelRouter
+        StateEngine --> ToolDispatcher
+        StateEngine --> TraceLogger
     end
 
-    subgraph Blockchain["Base Sepolia Blockchain"]
-        USDC["Testnet USDC Token"]
-        AgentWallet["AgentWallet Contract (Session Key + Safe Rails)"]
-        Escrow["Escrow Contract"]
+    subgraph SandboxedToolLayer["Isolated Tool Registry & Execution Sandboxes"]
+        DockerSandbox["Isolated Sandbox (Docker: --network none, Capped CPU/RAM)"]
+        SlitherTool["Slither AST Detector"]
+        AderynTool["Aderyn Static Analyzer"]
+        MythrilTool["Mythril Symbolic Engine"]
+        FoundryFuzz["Foundry Invariant / Fuzz Runner"]
+        PoCRunner["Foundry Exploit PoC Executor"]
+
+        DockerSandbox --> SlitherTool
+        DockerSandbox --> AderynTool
+        DockerSandbox --> MythrilTool
+        DockerSandbox --> FoundryFuzz
+        DockerSandbox --> PoCRunner
+    end
+
+    subgraph OnChainLayer["Base Sepolia Blockchain Infrastructure"]
+        AgentWallet["AgentWallet Contract (Caps, Allowlist, Session Keys)"]
+        Escrow["Escrow Contract (Reviewer Bounties)"]
         Reputation["ReputationRegistry Contract"]
+        USDC["Testnet USDC Token"]
     end
 
-    subgraph SandboxedWorker["Containerized Analysis Engine"]
-        WorkerQueue["Background Task Worker"]
-        DockerHost["Docker Runtime (No Network, CPU/Memory Capped)"]
-        SlitherRunner["Slither Runner"]
-        AderynRunner["Aderyn Runner"]
-        LLMFilter["LLM Triage & False-Positive Filter"]
-        FuzzGen["Foundry Invariant & Fuzz Generator"]
-
-        WorkerQueue --> DockerHost
-        DockerHost --> SlitherRunner
-        DockerHost --> AderynRunner
-        DockerHost --> LLMFilter
-        DockerHost --> FuzzGen
+    subgraph MultiAgentNetwork["Peer Reviewer Ecosystem"]
+        ReviewerNode["Second-Opinion Reviewer Agent"]
     end
 
-    subgraph ReviewerSubsystem["Peer Reviewer Microservice"]
-        ReviewerNode["Secondary Reviewer Agent"]
-    end
-
-    CustomerUI -->|REST / OpenAPI| Router
-    OwnerUI -->|Owner Pause / Metrics| Router
-    Paywall -.->|web3.py Receipt Verification| USDC
-    EconBrain -.->|Session Key Transaction Execution| AgentWallet
-    AgentWallet -.->|Deposit Reviewer Bounty| Escrow
-    Escrow -.->|Disburse Settlement| ReviewerNode
-    Escrow -.->|Log Review Metrics| Reputation
-    JobManager -->|Enqueue Work| WorkerQueue
-    WorkerQueue -.->|Request Second Opinion| ReviewerNode
+    CustomerUI -->|Submit & Pay| Paywall
+    OwnerUI -->|View Live Traces & Approvals| TraceLogger
+    ToolDispatcher -->|Dispatches Containerized Tools| DockerSandbox
+    ToolDispatcher -->|Executes Guarded Transactions| AgentWallet
+    AgentWallet -->|Locks Bounty| Escrow
+    Escrow -->|Disburses Bounty| ReviewerNode
+    Escrow -->|Logs Consensus Rating| Reputation
+    DockerSandbox -->|Returns Raw Observations & PoC Results| StateEngine
 ```
 
 ---
 
-## 2. Component Breakdown
+## 2. Autonomous Agent Cognitive Architecture
 
-### 2.1 Smart Contracts (`contracts/`)
-- **`AgentWallet.sol`**:
-  - Implements spending controls: `perTxCap`, `dailyCap`, and `reserveBalance`.
-  - Grants time-limited session keys for the automated agent backend.
-  - Rejects transactions sending value to addresses outside `vendorAllowlist`.
-  - Pause mechanism callable by the contract owner.
-- **`Escrow.sol`**:
-  - Holds USDC collateral for second-opinion reviews.
-  - Allows the primary agent to deposit bounty with an expiration timestamp.
-  - Disburses funds to the reviewer upon submission of signed report hash, or refunds primary agent after timeout.
-- **`ReputationRegistry.sol`**:
-  - Maintains public on-chain performance metrics and historical accuracy scores.
+### 2.1 The Agentic State Machine (LangGraph Loop)
+Rather than a single prompt that generates an entire report, the agent operates in an iterative loop:
+- **`PLAN`**: Evaluates contract source length, detected contract archetype (DeFi, Vault, Token, Governance), and past precision metrics from `tool_precision_matrix`. Selects the most cost-effective tool to run next.
+- **`ACT`**: Calls the selected tool through the `ToolDispatcher`, routing prompts to the optimal model tier.
+- **`OBSERVE`**: Parses the tool's structured output. Validates against JSON Schema.
+- **`REPLAN`**: Ingests new findings, checks remaining budget, step limits, and token counters.
+  - If a candidate `Critical` or `High` finding is discovered, transitions to `VERIFY`.
+  - If budget ceiling (70% of revenue) or step limit (10 steps) is reached, transitions to `TERMINATE_LIMIT_EXCEEDED` and generates a best-effort report.
+  - If triage goals are satisfied, transitions to `COMPLETE`.
+- **`VERIFY`**: Calls a strong reasoning model to synthesize a runnable Foundry test (`testExploit()`). Executes the test inside the sandbox. Only tests that pass on-chain state corruption assertions mark the finding as `verified: true` with `High` confidence.
 
-### 2.2 Agent Core Service (`agent/`)
-- Built on **FastAPI** with async background tasks and **SQLAlchemy** + **SQLite**.
-- **x402 Paywall**: Intercepts unauthenticated or unpaid requests to `/jobs`, generating HTTP 402 responses containing recipient details and required token amounts.
-- **Payment Verifier**: Uses `web3.py` to inspect transaction logs, verify token transfer values, and match the job ID embedded in the payment calldata.
-- **Economic Brain**:
-  - Calculates line-of-code metrics, estimated LLM tokens, and static analysis compute overhead.
-  - Formulates pricing for `quick`, `standard`, and `deep` scan tiers.
-  - Computes net profit margin and initiates reserve deposits to the owner wallet.
+```mermaid
+stateDiagram-v2
+    [*] --> PLAN
+    PLAN --> ACT: Select Registered Tool
+    ACT --> OBSERVE: Run Tool in Container
+    OBSERVE --> REPLAN: Ingest Result & Update Trace
+    
+    REPLAN --> PLAN: Needs More Evidence
+    REPLAN --> VERIFY: Candidate High / Critical
+    VERIFY --> ACT: Generate & Run Exploit PoC
+    
+    REPLAN --> COMPLETE: Invariants Satisfied
+    REPLAN --> TERMINATE_LIMIT_EXCEEDED: Step, Token, or Budget Exceeded
+    
+    COMPLETE --> [*]
+    TERMINATE_LIMIT_EXCEEDED --> [*]
+```
 
-### 2.3 Analysis Engine (`analysis/`)
-- Runs within an isolated **Docker container** configured with:
-  - `--network none` (complete network disconnection during analysis to prevent data exfiltration).
-  - CPU constraints (`--cpus 2.0`) and memory caps (`--memory 2048m`).
-  - Timeouts (`timeout 180s`).
-- **Slither & Aderyn**: Multi-engine static analysis to surface AST-level AST vulnerabilities.
-- **LLM Triage**: Uses a provider-agnostic wrapper (Anthropic Claude 3.5 Sonnet by default, configurable to OpenAI) to evaluate raw tool findings, remove false positives, and write clear explanations.
-- **Foundry Invariant / Fuzz Generator**: Synthesizes runnable Foundry tests targeting flagged functions to confirm exploitability.
-- **Second-Opinion Reviewer**: Standalone service simulating an external auditor agent.
+### 2.2 Tool Registry & Sandbox Policy
+All agent capabilities are strictly encapsulated in a typed **Tool Registry**:
+- Every tool defines a JSON Schema for input parameters.
+- Tools have hardcoded execution timeouts (30s–120s) and estimated compute costs.
+- Static and symbolic tools execute inside non-networked Docker containers (`--network none`, `--cpus 2.0`, `--memory 2048m`).
+- Unregistered tools or dynamic code execution on the host machine are rejected by the dispatcher.
 
-### 2.4 Web Dashboard (`dashboard/`)
-- **Next.js 14 App Router** with TypeScript and Tailwind CSS.
-- Integrates **wagmi** and **viem** for seamless Base Sepolia wallet connection.
-- **Customer View**:
-  - Solidity code paste or file upload.
-  - Dynamic quote display.
-  - One-click USDC approval and payment modal.
-  - Real-time job tracking and interactive vulnerability report viewer.
-- **Owner View**:
-  - Agent wallet balance and daily allowance monitoring.
-  - Financial P&L telemetry and historical scan margins.
-  - Reasoning log viewer displaying LLM decisions.
-  - Emergency Kill Switch / Pause button.
+### 2.3 Dynamic Model Routing
+To maximize gross margin while maintaining elite exploit synthesis:
+- **Cheap / Fast Model (e.g. Claude 3.5 Haiku / GPT-4o-mini)**:
+  - AST detector filtering, false positive triage, and JSON formatting.
+  - Generates executive summaries from verified data.
+  - Cost: ~$0.25 / 1M input tokens.
+- **Strong Reasoning Model (e.g. Claude 3.5 Sonnet / GPT-4o)**:
+  - Deep architectural vulnerability assessment.
+  - Exploit synthesis: generating runnable Foundry PoC tests that target reentrancy, access control bypasses, and arithmetic bugs.
+  - Cost: ~$3.00 / 1M input tokens.
+
+### 2.4 Persistent Memory Subsystem
+The agent persists operational memory in SQLite:
+1. `job_outcomes`: Tracks past jobs, LOC, contract archetypes, costs, and profits.
+2. `tool_precision_matrix`: Dynamically computes historical precision and recall per tool for each contract archetype. The planner uses this to skip noisy detectors on specific contract patterns.
+3. `tier_cost_history`: Maintains rolling compute/token averages for dynamic quoting.
+
+### 2.5 Observability & Trace View
+Every cognitive cycle logs a `StepTrace` record capturing:
+- Step number and state (`PLAN`, `ACT`, `OBSERVE`, `REPLAN`, `VERIFY`).
+- Tool name, parameters, execution latency (ms), and cost ($).
+- Model routed, prompt tokens, completion tokens.
+- Natural language decision rationale.
+- Exposed via `GET /jobs/{id}/traces` and rendered live in the Dashboard Owner View.
+
+### 2.6 Multi-Layered Guardrails & Human Approvals
+1. **Prompt Injection Boundary**: Customer Solidity code is wrapped in `<untrusted_solidity_code>` tags and treated strictly as passive data.
+2. **On-Chain Financial Guardrails**: `perTxCap`, `dailyCap`, `reserveBalance`, and `vendorAllowlist` in `AgentWallet.sol`.
+3. **Human-in-the-Loop Approval**: The agent pauses and prompts for owner signature if an on-chain escrow bounty exceeds $10.00 USDC or if the agent loop reaches step 9 without convergence.

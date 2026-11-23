@@ -11,7 +11,10 @@ def test_mock_report_structure():
     assert report["scan_depth"] == "deep"
     assert "summary" in report
     assert report["summary"]["risk_score"] > 0
+    assert report["summary"]["total_verified"] >= 1
     assert len(report["findings"]) > 0
+    assert report["findings"][0]["verified"] is True
+    assert "poc_path" in report["findings"][0]
 
 def test_findings_normalizer():
     dummy_slither = {
@@ -31,6 +34,8 @@ def test_findings_normalizer():
     assert normalized["severity"] == "Critical"
     assert normalized["location"]["start_line"] == 20
     assert normalized["location"]["end_line"] == 25
+    assert "verified" in normalized
+    assert normalized["verified"] is False
 
 def test_runner_returns_valid_payload():
     result = run_analysis("pragma solidity ^0.8.20; contract Test {}", scan_depth="quick", job_id="quick-job")

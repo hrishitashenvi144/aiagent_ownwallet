@@ -32,7 +32,7 @@ def test_job_x402_payment_required():
     assert data["error"] == "Payment Required"
     assert data["required_amount_usdc"] == 15.0
 
-def test_job_submission_with_payment_proof():
+def test_job_submission_with_payment_proof_and_traces():
     # Submitting with payment proof proceeds to HTTP 201
     fake_tx = "0x" + "a" * 64
     response = client.post(
@@ -53,6 +53,26 @@ def test_job_submission_with_payment_proof():
     report_res = client.get(f"/jobs/{job_id}/report")
     assert report_res.status_code == 200
     assert "findings" in report_res.json()
+    assert report_res.json()["summary"]["total_verified"] >= 1
+
+    # Verify execution traces endpoint
+    traces_res = client.get(f"/jobs/{job_id}/traces")
+    assert traces_res.status_code == 200
+    traces = traces_res.json()
+    assert len(traces) >= 3
+    states = [t["state"] for t in traces]
+    assert "PLAN" in states
+    assert "ACT" in states
+    assert "VERIFY" in states
+
+    # Verify human approval endpoint
+    approval_res = client.post(f"/jobs/{job_id}/approve-action", json={
+        "action_id": "act-subagent-01",
+        "approved": True,
+        "operator_notes": "Approved for testing"
+    })
+    assert approval_res.status_code == 200
+    assert approval_res.json()["status"] == "approved"
 
 def test_agent_status_and_pause():
     status_res = client.get("/agent/status")

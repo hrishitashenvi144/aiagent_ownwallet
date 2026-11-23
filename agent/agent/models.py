@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field
 
 class QuoteRequest(BaseModel):
@@ -47,3 +47,25 @@ class AgentStatusResponse(BaseModel):
 class PauseRequest(BaseModel):
     paused: bool
     signature: str
+
+class StepTrace(BaseModel):
+    step_number: int
+    state: str = Field(pattern="^(PLAN|ACT|OBSERVE|REPLAN|VERIFY|COMPLETE|TERMINATE_LIMIT_EXCEEDED)$")
+    tool_call: Optional[str] = None
+    tool_input: Optional[Dict[str, Any]] = None
+    tool_output: Optional[Dict[str, Any]] = None
+    latency_ms: int
+    cost_usd: float
+    tokens_used: Optional[int] = None
+    model_routed: Optional[str] = None
+    rationale: str
+    timestamp: str
+
+class ActionApprovalRequest(BaseModel):
+    action_id: str
+    approved: bool
+    operator_notes: Optional[str] = None
+
+class ActionApprovalResponse(BaseModel):
+    action_id: str
+    status: str

@@ -49,5 +49,7 @@ class FindingsNormalizer:
             "evidence": description[:200],
             "explanation": description,
             "suggested_fix": "Review Slither detector recommendations and verify access controls / state ordering.",
-            "tool_source": "slither"
+            "tool_source": "slither",
+            "verified": False,
+            "poc_path": ""
         }
