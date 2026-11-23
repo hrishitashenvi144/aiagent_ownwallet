@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: AuditAgent Service API
   description: Autonomous AI blockchain smart contract security triage & audit API with x402 on-chain payment integration.
-  version: 0.1.0
+  version: 0.2.0
 servers:
   - url: http://localhost:8000
     description: Local development agent service
@@ -11,7 +11,7 @@ paths:
   /quote:
     post:
       summary: Request dynamic quote for audit
-      description: Returns pricing and depth recommendations based on source complexity and gas costs.
+      description: Returns pricing and depth recommendations based on source complexity and historical memory.
       operationId: getQuote
       requestBody:
         required: true
@@ -45,7 +45,7 @@ paths:
       description: |
         Submits a job. If payment proof is omitted or unverified, returns HTTP 402 Payment Required
         with instructions and recipient address. If payment proof (tx hash) is provided in headers
-        or payload and verified on-chain, job transitions to 'paid' and triggers analysis.
+        or payload and verified on-chain, job transitions to 'paid' and triggers the agentic loop.
       operationId: createJob
       parameters:
         - name: X-Payment-Proof
@@ -80,7 +80,7 @@ paths:
                   description: Alternative to X-Payment-Proof header
       responses:
         '201':
-          description: Job created and payment verified; analysis started
+          description: Job created and payment verified; agent loop started
           content:
             application/json:
               schema:
@@ -146,6 +146,55 @@ paths:
           description: Report not ready yet (status is analyzing or paid)
         '404':
           description: Job or report not found
+
+  /jobs/{job_id}/traces:
+    get:
+      summary: Retrieve execution traces for the job agent loop
+      description: Returns step-by-step trace of plan, act, observe, replan iterations, tool invocations, rationale, and cost.
+      operationId: getJobTraces
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Array of execution traces
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StepTrace'
+        '404':
+          description: Job not found
+
+  /jobs/{job_id}/approve-action:
+    post:
+      summary: Human-in-the-loop approval for high-risk or high-cost tool actions
+      operationId: approveAction
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionApprovalRequest'
+      responses:
+        '200':
+          description: Approval decision recorded; agent loop resumed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionApprovalResponse'
+        '404':
+          description: Job or pending action not found
 
   /agent/status:
     get:
@@ -293,7 +342,7 @@ components:
 
     Finding:
       type: object
-      required: [id, title, severity, confidence, location, evidence, explanation, suggested_fix, tool_source]
+      required: [id, title, severity, confidence, location, evidence, explanation, suggested_fix, tool_source, verified]
       properties:
         id:
           type: string
@@ -327,7 +376,12 @@ components:
           type: string
         tool_source:
           type: string
-          enum: [slither, aderyn, llm, foundry_fuzz]
+          enum: [slither, aderyn, mythril, llm, foundry_fuzz]
+        verified:
+          type: boolean
+          description: True if confirmed by an executable Foundry PoC exploit test
+        poc_path:
+          type: string
         poc_test_path:
           type: string
 
@@ -361,6 +415,8 @@ components:
               type: integer
             total_informational:
               type: integer
+            total_verified:
+              type: integer
         findings:
           type: array
           items:
@@ -380,3 +436,56 @@ components:
               type: string
         gas_report:
           type: object
+
+    StepTrace:
+      type: object
+      required: [step_number, state, rationale, latency_ms, cost_usd]
+      properties:
+        step_number:
+          type: integer
+        state:
+          type: string
+          enum: [PLAN, ACT, OBSERVE, REPLAN, VERIFY, COMPLETE, TERMINATE_LIMIT_EXCEEDED]
+        tool_call:
+          type: string
+          nullable: true
+        tool_input:
+          type: object
+          nullable: true
+        tool_output:
+          type: object
+          nullable: true
+        latency_ms:
+          type: integer
+        cost_usd:
+          type: number
+        tokens_used:
+          type: integer
+        model_routed:
+          type: string
+        rationale:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    ActionApprovalRequest:
+      type: object
+      required: [action_id, approved]
+      properties:
+        action_id:
+          type: string
+        approved:
+          type: boolean
+        operator_notes:
+          type: string
+
+    ActionApprovalResponse:
+      type: object
+      required: [action_id, status]
+      properties:
+        action_id:
+          type: string
+        status:
+          type: string
+          enum: [approved, rejected, expired]

@@ -19,6 +19,8 @@ def get_mock_findings() -> List[Dict[str, Any]]:
             "explanation": "State variable userBalances is modified after external call to msg.sender, permitting recursive reentrancy exploit.",
             "suggested_fix": "Apply Checks-Effects-Interactions pattern or inherit OpenZeppelin ReentrancyGuard.",
             "tool_source": "slither",
+            "verified": True,
+            "poc_path": "test/PoCReentrancy.t.sol",
             "poc_test_path": "test/PoCReentrancy.t.sol"
         },
         {
@@ -36,7 +38,9 @@ def get_mock_findings() -> List[Dict[str, Any]]:
             "evidence": "token.transfer(feeCollector, amount);",
             "explanation": "Return value of ERC20 transfer is ignored. Some tokens (e.g. USDT) do not revert on failure.",
             "suggested_fix": "Use OpenZeppelin SafeERC20.safeTransfer instead.",
-            "tool_source": "aderyn"
+            "tool_source": "aderyn",
+            "verified": False,
+            "poc_path": ""
         }
     ]
 
@@ -53,10 +57,18 @@ def get_mock_report(job_id: str = "mock-job-123", scan_depth: str = "standard") 
             "total_high": 0,
             "total_medium": 0,
             "total_low": 1,
-            "total_informational": 0
+            "total_informational": 0,
+            "total_verified": 1
         },
         "findings": findings,
-        "triage_notes": "Automated triage detected 1 confirmed Critical reentrancy vulnerability. State update occurs post-call without protection.",
+        "triage_notes": "Automated triage detected 1 confirmed Critical reentrancy vulnerability, validated via an executed Foundry PoC test.",
+        "agent_execution_summary": {
+            "total_steps": 4,
+            "total_tokens": 12450,
+            "total_cost_usd": 0.082,
+            "tools_executed": ["slither_static", "aderyn_static", "exploit_poc_runner"],
+            "trace_available": True
+        },
         "second_opinion": {
             "reviewer_address": "0xReviewerAgentStubAddress7777777777777777",
             "escrow_id": "0xescrow1234567890",
