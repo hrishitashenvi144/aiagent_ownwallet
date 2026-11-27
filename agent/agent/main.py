@@ -12,6 +12,13 @@ from agent.models import (
     AgentStatusResponse, PauseRequest,
     StepTrace, ActionApprovalRequest, ActionApprovalResponse
 )
+from agent.web3_client import Web3Client
+from agent.payment_verifier import (
+    PaymentVerifier,
+    PaymentVerificationError,
+    ReplayAttackError,
+    InvalidPaymentProofError
+)
 
 app = FastAPI(
     title="AuditAgent Service API",
@@ -32,6 +39,9 @@ JOBS_DB: Dict[str, dict] = {}
 TRACES_DB: Dict[str, List[dict]] = {}
 PENDING_APPROVALS: Dict[str, dict] = {}
 
+web3_client = Web3Client()
+payment_verifier = PaymentVerifier(web3_client=web3_client)
+
 AGENT_STATE = {
     "wallet_address": os.getenv("AGENT_WALLET_ADDRESS", "0x1234567890123456789012345678901234567890"),
     "usdc_token": os.getenv("USDC_TOKEN_ADDRESS", "0x036CbD53842c5426634e7929541eC2318f3dCF7e"),
@@ -41,6 +51,12 @@ AGENT_STATE = {
     "is_paused": False,
     "start_time": datetime.now(timezone.utc)
 }
+
+def set_agent_contracts(wallet_address: str, usdc_token: str):
+    """Update active contract addresses in agent state."""
+    AGENT_STATE["wallet_address"] = wallet_address
+    AGENT_STATE["usdc_token"] = usdc_token
+
 
 PRICING_TABLE = {
     "quick": {"usdc": 10.0, "raw": "10000000", "time": 45},
@@ -174,7 +190,26 @@ def create_job(
             headers=headers
         )
 
-    # In mock/test mode: valid tx_hash marks job as paid and triggers agentic loop
+    # Verify payment proof & defend against replay attacks
+    try:
+        payment_verifier.verify(
+            tx_hash=tx_hash,
+            expected_recipient=AGENT_STATE["wallet_address"],
+            expected_amount_raw=int(tier["raw"]),
+            expected_job_id=job_id,
+            allow_mock=True
+        )
+    except ReplayAttackError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Replay attack detected: {str(exc)}"
+        )
+    except (InvalidPaymentProofError, PaymentVerificationError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Payment verification failed: {str(exc)}"
+        )
+
     job_record = {
         "job_id": job_id,
         "status": "delivered",
@@ -230,6 +265,21 @@ def approve_action(job_id: str, payload: ActionApprovalRequest):
 @app.get("/agent/status", response_model=AgentStatusResponse)
 def get_agent_status():
     uptime = (datetime.now(timezone.utc) - AGENT_STATE["start_time"]).total_seconds()
+
+    # Query live on-chain status if Web3 RPC is connected
+    if web3_client.is_connected:
+        try:
+            onchain = web3_client.get_wallet_status(
+                wallet_address=AGENT_STATE["wallet_address"],
+                usdc_address=AGENT_STATE["usdc_token"]
+            )
+            AGENT_STATE["usdc_balance"] = onchain["usdc_balance"]
+            AGENT_STATE["daily_spent"] = onchain["daily_spent"]
+            AGENT_STATE["daily_limit"] = onchain["daily_cap"]
+            AGENT_STATE["is_paused"] = onchain["is_paused"]
+        except Exception:
+            pass
+
     return AgentStatusResponse(
         status="paused" if AGENT_STATE["is_paused"] else "idle",
         wallet_address=AGENT_STATE["wallet_address"],

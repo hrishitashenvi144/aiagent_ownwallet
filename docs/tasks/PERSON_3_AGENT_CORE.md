@@ -52,15 +52,15 @@
   - *Done When*: Dashboard can fetch mock quotes, reports, and execution traces.
 
 ### Week 2: x402 Paywall & Memory-Calibrated Quoting
-- [ ] Implement `POST /quote` querying `tier_cost_history` in Agent Memory to dynamically calculate USDC prices targeting a $\ge 40\%$ gross margin. *(Est: 5h)*
+- [x] Implement `POST /quote` querying `tier_cost_history` in Agent Memory to dynamically calculate USDC prices targeting a $\ge 40\%$ gross margin. *(Est: 5h)*
   - *Done When*: Endpoint returns valid `Quote` object adhering to `shared/schemas/quote.json`.
-- [ ] Implement x402 response on `POST /jobs` returning HTTP 402 with `X-Accept-Token`, `X-Payment-Address`, and `X-Required-Amount` headers when payment proof is missing. *(Est: 5h)*
+- [x] Implement x402 response on `POST /jobs` returning HTTP 402 with `X-Accept-Token`, `X-Payment-Address`, and `X-Required-Amount` headers when payment proof is missing. *(Est: 5h)*
   - *Done When*: Unpaid submissions return status code 402 and payment instructions.
 
 ### Week 3: On-Chain Payment Verification with web3.py
-- [ ] Implement `agent/agent/payment_verifier.py` using `web3.py` to inspect Base Sepolia transactions. *(Est: 6h)*
+- [x] Implement `agent/agent/payment_verifier.py` using `web3.py` to inspect Base Sepolia transactions. *(Est: 6h)*
   - *Done When*: Verifier confirms recipient matches `AGENT_WALLET_ADDRESS`, token matches USDC, amount matches quote, and logs contain `job_id`.
-- [ ] Prevent replay attacks by asserting transaction hashes are strictly unique in SQLite. *(Est: 4h)*
+- [x] Prevent replay attacks by asserting transaction hashes are strictly unique in SQLite. *(Est: 4h)*
   - *Done When*: Reused transaction hash returns HTTP 409 Conflict.
 
 ### Week 4: LangGraph Agent Loop State Machine (Milestone 1)
@@ -87,7 +87,7 @@
 ### Week 7: Persistent Memory Updates & Multi-Agent Escrow
 - [ ] Update `tool_precision_matrix` and `job_outcomes` at the end of every completed job to refine historical accuracy per archetype. *(Est: 5h)*
   - *Done When*: Memory tables reflect verified vs. unverified findings and realized profit.
-- [ ] Wire multi-agent escrow subcontracting tool (`subagent_escrow_hire`) using session keys on `Escrow.sol` for `deep` tier jobs. *(Est: 5h)*
+- [x] Wire multi-agent escrow subcontracting tool (`subagent_escrow_hire`) using session keys on `Escrow.sol` for `deep` tier jobs. *(Est: 5h)*
   - *Done When*: Bounty is deposited on Base Sepolia and released upon consensus delivery.
 
 ### Week 8: Observability Traces & Human-in-the-Loop Approvals
