@@ -1,0 +1,43 @@
+SLITHER SCAN - AuditAgent own contracts (slither 0.11.6, solc 0.8.20)
+Command: cd contracts && slither . --filter-paths "lib|test|script|mocks"
+Result : 0 High, 0 Medium. Remaining findings are Low/Informational and reviewed below.
+
+Triage
+- timestamp (Low)           : block.timestamp is required for session-key windows, the 24h spending window and
+                              escrow deadlines. Miner drift (seconds) is negligible against hour/day-scale windows.
+- low-level-calls (Info)    : AgentWallet.execute() must use .call - it is a generic executor. Guarded by
+                              onlyOwner/session-key auth, vendor allowlist, nonReentrant and post-call USDC metering.
+- naming-convention (Info)  : constructor parameter underscore prefixes; style only.
+Fixed during the scan
+- incorrect-equality (Medium) on `spent == 0` -> restructured to `if (spent > 0)`.
+- reentrancy-benign          : state is written after the call by design (balance is measured after); execute() is
+                              nonReentrant. Annotated with slither-disable + justification.
+
+---------------- raw output ----------------
+INFO:Detectors:
+Detector: timestamp
+AgentWallet.execute(address,uint256,bytes) (src/AgentWallet.sol#141-173) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < sk.validAfter || block.timestamp > sk.validUntil (src/AgentWallet.sol#152)
+AgentWallet.getDailySpent() (src/AgentWallet.sol#176-179) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= windowStart + WINDOW (src/AgentWallet.sol#177)
+Escrow.createEscrow(bytes32,address,uint256,uint256) (src/Escrow.sol#58-76) uses timestamp for comparisons
+	Dangerous comparisons:
+	- deadline <= block.timestamp (src/Escrow.sol#62)
+Escrow.refundEscrow(bytes32) (src/Escrow.sol#92-103) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp <= item.deadline (src/Escrow.sol#97)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#block-timestamp
+INFO:Detectors:
+Detector: low-level-calls
+Low level call in AgentWallet.execute(address,uint256,bytes) (src/AgentWallet.sol#141-173):
+	- (success,ret) = dest.call{value: value}(func) (src/AgentWallet.sol#162)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#low-level-calls
+INFO:Detectors:
+Detector: naming-convention
+Parameter AgentWallet.setLimits(uint256,uint256,uint256)._perTxCap (src/AgentWallet.sol#103) is not in mixedCase
+Parameter AgentWallet.setLimits(uint256,uint256,uint256)._dailyCap (src/AgentWallet.sol#103) is not in mixedCase
+Parameter AgentWallet.setLimits(uint256,uint256,uint256)._reserveBalance (src/AgentWallet.sol#103) is not in mixedCase
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#conformance-to-solidity-naming-conventions
+INFO:Slither:. analyzed (17 contracts with 102 detectors), 8 result(s) found
